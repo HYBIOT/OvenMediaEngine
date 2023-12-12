@@ -1,0 +1,39 @@
+version: "3.9"
+
+networks:
+  proxy:
+    external: true
+    name: proxy-network
+
+volumes:
+  ome_config:
+    name: ome-config
+  ome_edge:
+    name: ome-edge
+  ome-logs:
+    name: ome-logs
+
+services:
+  ${SERVICE_NAME}:
+    image: ${IMAGE_NAME}:${IMAGE_TAG}
+    container_name: ${SERVICE_NAME}
+    volumes:
+      - ome_config:/opt/ovenmediaengine/bin/origin_conf
+      - ome_dege:/opt/ovenmediaengine/bin/edge_conf
+      - ome_logs:/var/log/ovenmediaengine
+    ports:
+      - "9999:9999/udp"
+      - "3478:3478"
+      - "10000-10009:10000-10009/udp"
+      - "1935:1935" # RTMP
+      - "4000-4999:4000-4999/udp" # WebRTC, MPEG-TS, SRT
+      - "4000-4999:4000-4999/tcp" # WebRTC, MPEG-TS, SRT
+      - "8081:8081"
+      - "8080:8080" # HTTP
+      - "39000:9000" # HTTPS
+      - "3333:3333" # OVT
+    env_file:
+      - ./.env.compose
+    restart: unless-stopped
+    networks:
+       - proxy
