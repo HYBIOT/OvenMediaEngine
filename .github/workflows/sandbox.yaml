@@ -3,7 +3,6 @@ on:
   push:
     branches:
       - develop
-      - feature/SRE-362-github-actions
 
 env:
   # Manage your service
@@ -13,13 +12,14 @@ env:
   ENVIRONMENT_NAME: sandbox
   DOCKERFILE: ./Dockerfile
   DOCKER_COMPOSE: .deployment/docker-compose.yaml
-  COMPOSE_ENV_FILE: .deployment/.env.sandbox
+  DOCKER_COMPOSE_DEPLOY: .deployment/compose-deploy.yaml
+  COMPOSE_ENV_FILE: .deployment/.env
   COMPOSE_APP_ENV_FILE: .deployment/.env.compose
 
 jobs:
   dockerize:
     name: Build and Push Docker image to Registry
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-22.04
     environment: sandbox
     steps:
       - 
@@ -69,7 +69,7 @@ jobs:
 
   deploy:
     name: Deploy Sandbox Service
-    runs-on: [self-hosted, linux, x64, staging, hybiot, internal]
+    runs-on: [self-hosted, linux, x64, ome-poc, hybiot, internal]
     environment: sandbox
     needs:
       - dockerize
@@ -100,22 +100,27 @@ jobs:
       - 
         name: Create env Docker-Compose
         run: |
+          touch ${{ env.COMPOSE_ENV_FILE }}
+          echo '' > ${{ env.COMPOSE_ENV_FILE }}
+          echo IMAGE_NAME=ghcr.io/${{ steps.repository.outputs.lowercase }} >> ${{ env.COMPOSE_ENV_FILE }}
+          echo IMAGE_TAG=${{ env.sha_short }} >> ${{ env.COMPOSE_ENV_FILE }}
+          echo SERVICE_NAME=${{ env.SERVICE_NAME }} >> ${{ env.COMPOSE_ENV_FILE }}
           touch ${{ env.COMPOSE_APP_ENV_FILE }}
-          cat .deployment/.env.${{ env.COMPOSE_ENV_FILE }} >> ${{ env.COMPOSE_APP_ENV_FILE }}
+          cat .deployment/.env.${{ env.ENVIRONMENT_NAME }} >> ${{ env.COMPOSE_APP_ENV_FILE }}
+          envsubst < ${{ env.DOCKER_COMPOSE }} > ${{ env.DOCKER_COMPOSE_DEPLOY }}
         env:
           IMAGE_NAME: ghcr.io/${{ steps.repository.outputs.lowercase }}
           IMAGE_TAG: ${{ env.sha_short }}
           SERVICE_NAME: ${{ env.SERVICE_NAME }}
-      -
-        name: Docker-Compose Deploy
-        uses: alex-ac/github-action-ssh-docker-compose@master
-        with:
-          ssh_host: "10.100.100.12"
-          ssh_user: "root"
-          ssh_port: "22"
-          ssh_private_key: ${{ secrets.PIPELINE_DEPLOY_KEY }}
-          docker_compose_prefix: ${{ env.SERVICE_NAME }}
-          docker_compose_filename: ${{ env.DOCKER_COMPOSE }}
+      - 
+        name: Starting docker compose services
+        run: |
+          docker compose -f ${{ env.DOCKER_COMPOSE_DEPLOY }} pull
+          docker compose -f ${{ env.DOCKER_COMPOSE_DEPLOY }} up -d
+          docker ps -a
+        env:
+          COMPOSE_HTTP_TIMEOUT: 600
+          SERVICE_NAME: ${{ env.SERVICE_NAME }}
 
   notify:
     name: Discord Notification

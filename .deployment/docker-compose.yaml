@@ -7,11 +7,11 @@ networks:
 
 volumes:
   ome_config:
-    name: ome-config
+    name: ome_config
   ome_edge:
-    name: ome-edge
-  ome-logs:
-    name: ome-logs
+    name: ome_edge
+  ome_logs:
+    name: ome_logs
 
 services:
   ${SERVICE_NAME}:
@@ -19,21 +19,30 @@ services:
     container_name: ${SERVICE_NAME}
     volumes:
       - ome_config:/opt/ovenmediaengine/bin/origin_conf
-      - ome_dege:/opt/ovenmediaengine/bin/edge_conf
+      - ome_edge:/opt/ovenmediaengine/bin/edge_conf
       - ome_logs:/var/log/ovenmediaengine
     ports:
-      - "9999:9999/udp"
       - "3478:3478"
-      - "10000-10009:10000-10009/udp"
       - "1935:1935" # RTMP
-      - "4000-4999:4000-4999/udp" # WebRTC, MPEG-TS, SRT
-      - "4000-4999:4000-4999/tcp" # WebRTC, MPEG-TS, SRT
-      - "8081:8081"
       - "8080:8080" # HTTP
-      - "39000:9000" # HTTPS
+      #- "39000:9000" # HTTPS
+      - "8081:8081"
       - "3333:3333" # OVT
+      #- "9999:9999/udp"
+      #- "10000-10009:10000-10009/udp"
+      # - "4000-4999:4000-4999/udp" # WebRTC, MPEG-TS, SRT
+      # - "4000-4999:4000-4999/tcp" # WebRTC, MPEG-TS, SRT
     env_file:
       - ./.env.compose
     restart: unless-stopped
     networks:
        - proxy
+    deploy:
+      resources:
+        reservations:
+          cpus: '1.5'
+          memory: 2048M
+        limits:
+          cpus: '2'
+          memory: 3072M
+
